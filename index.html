@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>NEURAL-OS | Notion Edition</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root { 
+            --bg: #191919; --panel: #222222; --accent: #00f2ff; 
+            --burn: #ff2a6d; --gain: #05ffa1; --text: #d1d5db;
+            --border: #2f2f2f; --level: #f5ed4e;
+        }
+        body.lvl-3 { --accent: #ffcc00; }
+        body.lvl-5 { --accent: #00ff88; }
+        body.lvl-10 { --accent: #eb5757; }
+
+        * { box-sizing: border-box; transition: 0.1s ease; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
+
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
+
+        .sidebar { width: 300px; background: var(--bg); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 15px; gap: 10px; }
+        .main-deck { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+        .void-panel { width: 280px; background: var(--bg); border-left: 1px solid var(--border); display: flex; flex-direction: column; }
+
+        .stat-card { background: var(--panel); border: 1px solid var(--border); padding: 12px; border-radius: 8px; }
+        .xp-bar { width: 100%; height: 6px; background: #000; border-radius: 10px; margin-top: 8px; overflow: hidden; }
+        #xp-fill { height: 100%; width: 0%; background: var(--level); box-shadow: 0 0 8px var(--level); }
+
+        .task-card { background: var(--panel); border: 1px solid var(--border); padding: 12px; border-radius: 8px; display: flex; align-items: center; gap: 10px; }
+        .task-card.completed { border-color: var(--gain); opacity: 0.5; }
+        .check-node { width: 20px; height: 20px; border: 2px solid var(--border); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .completed .check-node { background: var(--gain); border-color: var(--gain); color: #000; }
+
+        .node-stepper { display: flex; align-items: center; background: #000; border-radius: 6px; border: 1px solid var(--border); padding: 2px; }
+        .node-btn { background: #333; border: none; color: var(--accent); width: 24px; height: 24px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .node-btn:hover { background: var(--accent); color: #000; }
+        .node-input { background: none; border: none; color: white; width: 32px; text-align: center; font-size: 11px; font-family: monospace; }
+
+        .btn-sync { background: var(--gain); color: #000; padding: 12px; border-radius: 6px; width: 100%; font-weight: bold; cursor: pointer; border: none; margin-top: auto; }
+        .trash-btn { background: none; border: none; color: var(--burn); cursor: pointer; opacity: 0.4; }
+        .trash-btn:hover { opacity: 1; }
+
+        #chat-log { flex-grow: 1; padding: 10px; overflow-y: auto; font-size: 12px; display: flex; flex-direction: column; gap: 8px; }
+        .msg { background: #252525; padding: 8px; border-radius: 6px; border-left: 2px solid var(--accent); }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="stat-card">
+        <div style="font-size: 9px; color: var(--accent); letter-spacing: 1px;" id="unlock-hint">LEVEL UP TO UNLOCK THEMES</div>
+        <h3 id="lvl-display" style="margin: 5px 0; color: var(--level);">LVL 1</h3>
+        <div class="xp-bar"><div id="xp-fill"></div></div>
+        <div style="font-size: 10px; margin-top: 8px; display:flex; justify-content:space-between">
+            <span>Streak: <b id="streak-val">0</b></span>
+            <span>XP: <b id="xp-val">0</b></span>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div style="font-size: 9px; opacity: 0.5;">CAPACITY</div>
+        <div class="node-stepper" style="margin-top:5px; justify-content: space-between;">
+            <button class="node-btn" onclick="stepCap(-5)">-</button>
+            <input type="number" id="startME" value="50" class="node-input" onchange="save()">
+            <button class="node-btn" onclick="stepCap(5)">+</button>
+        </div>
+    </div>
+
+    <div id="archive-list" style="overflow-y: auto; flex-grow: 1; border-top: 1px solid var(--border); padding-top: 10px;"></div>
+    <button class="btn-sync" onclick="archiveDay()">SYNC CYCLE DATA</button>
+</div>
+
+<div class="main-deck">
+    <div class="stat-card">
+        <div style="height: 180px;"><canvas id="energyChart"></canvas></div>
+        <button class="btn-sync" style="background:var(--accent); margin-top:10px; padding: 8px;" onclick="optimize()">OPTIMIZE FLOW</button>
+    </div>
+
+    <div id="taskList" style="display: flex; flex-direction: column; gap: 8px;"></div>
+
+    <div class="task-card" style="border-style: dashed; background: transparent;">
+        <input type="text" id="newName" placeholder="Add task..." style="background:none; border:none; color:white; flex-grow:1; outline:none; font-size: 13px;">
+        <div class="node-stepper"><input type="number" id="newCost" value="10" class="node-input"></div>
+        <div class="node-stepper"><input type="number" id="newGain" value="5" class="node-input"></div>
+        <button class="node-btn" style="width:30px; background:var(--accent); color:#000" onclick="addTask()">+</button>
+    </div>
+</div>
+
+<div class="void-panel">
+    <div style="padding:15px; border-bottom:1px solid var(--border); font-size:11px; font-weight:bold; color:var(--accent);">INTERNAL DIALOGUE</div>
+    <div id="chat-log"></div>
+    <div style="padding:10px; border-top:1px solid var(--border); display:flex; gap:5px;">
+        <input type="text" id="chatInput" placeholder="Log a thought..." style="background:#000; border:1px solid var(--border); color:white; flex-grow:1; padding:8px; border-radius:4px; outline:none; font-size: 12px;" onkeypress="if(event.key==='Enter') sendChat()">
+    </div>
+</div>
+
+<script>
+    let state = JSON.parse(localStorage.getItem('notion_neural_v9')) || {
+        tasks: [], startME: 50, history: {}, xp: 0, streak: 0, chat: [], xpClaims: {}
+    };
+    let chart;
+
+    function init() {
+        const ctx = document.getElementById('energyChart').getContext('2d');
+        chart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'ME', data: [], borderColor: '#00f2ff', tension: 0.4, fill: true, backgroundColor: 'rgba(0,242,255,0.05)', pointRadius: 2 }] },
+            options: { maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 100, grid: { color: '#2f2f2f' } }, x: { display: false } }, plugins: { legend: { display: false } } }
+        });
+        render();
+    }
+
+    function stepCap(v) { document.getElementById('startME').value = parseInt(document.getElementById('startME').value) + v; save(); }
+
+    function addTask() {
+        const name = document.getElementById('newName').value;
+        if(!name) return;
+        state.tasks.push({ id: Date.now(), name, cost: parseInt(document.getElementById('newCost').value) || 0, gain: parseInt(document.getElementById('newGain').value) || 0, done: false, paid: false });
+        save();
+        document.getElementById('newName').value = '';
+    }
+
+    function toggleTask(i) {
+        const t = state.tasks[i];
+        t.done = !t.done;
+        if(t.done && !t.paid) { state.xp += 20; t.paid = true; } // PATCHED: No XP farming
+        save();
+    }
+
+    function sendChat() {
+        const input = document.getElementById('chatInput');
+        if(!input.value) return;
+        state.chat.push({ msg: input.value, time: new Date().toLocaleTimeString() });
+        input.value = '';
+        save();
+    }
+
+    function save() {
+        state.startME = parseInt(document.getElementById('startME').value) || 0;
+        localStorage.setItem('notion_neural_v9', JSON.stringify(state));
+        render();
+    }
+
+    function render() {
+        const list = document.getElementById('taskList'); list.innerHTML = '';
+        let cur = state.startME; let chartData = [cur]; let labels = ['Start'];
+
+        state.tasks.forEach((t, i) => {
+            if(t.done) cur += t.gain; else cur = cur - t.cost + t.gain;
+            const div = document.createElement('div');
+            div.className = `task-card ${t.done ? 'completed' : ''}`;
+            div.innerHTML = `<div class="check-node" onclick="toggleTask(${i})">${t.done ? '✓' : ''}</div><span style="flex-grow:1; font-size:13px;">${t.name}</span><div class="node-stepper"><input type="number" class="node-input" value="${t.cost}" onchange="state.tasks[${i}].cost=parseInt(this.value);save()"></div><div class="node-stepper" style="color:var(--gain)"><input type="number" class="node-input" value="${t.gain}" onchange="state.tasks[${i}].gain=parseInt(this.value);save()"></div><button class="trash-btn" onclick="state.tasks.splice(${i},1);save()"><i class="fas fa-trash"></i></button>`;
+            list.appendChild(div);
+            chartData.push(Math.min(Math.max(cur, 0), 100)); labels.push(t.name);
+        });
+
+        chart.data.datasets[0].data = chartData; chart.data.labels = labels; chart.update();
+
+        const lvl = Math.floor(state.xp / 100) + 1;
+        document.body.className = lvl >= 10 ? 'lvl-10' : lvl >= 5 ? 'lvl-5' : lvl >= 3 ? 'lvl-3' : '';
+        document.getElementById('lvl-display').innerText = `LVL ${lvl}`;
+        document.getElementById('xp-fill').style.width = `${state.xp % 100}%`;
+        document.getElementById('xp-val').innerText = state.xp;
+        document.getElementById('streak-val').innerText = state.streak;
+        document.getElementById('unlock-hint').innerText = lvl < 3 ? "UNLOCK AMBER AT LVL 3" : lvl < 5 ? "UNLOCK FOREST AT LVL 5" : lvl < 10 ? "UNLOCK CRIMSON AT LVL 10" : "MAX RANK REACHED";
+
+        document.getElementById('chat-log').innerHTML = state.chat.slice(-5).map(m => `<div class="msg"><b>${m.time}</b><br>${m.msg}</div>`).join('');
+        const arc = document.getElementById('archive-list');
+        arc.innerHTML = Object.keys(state.history).reverse().map(date => `<div style="display:flex; justify-content:space-between; font-size:11px; padding:5px; border-bottom:1px solid #2f2f2f"><span>${date}</span><button class="trash-btn" onclick="deleteHistory('${date}')">×</button></div>`).join('');
+    }
+
+    function deleteHistory(d) { delete state.history[d]; save(); }
+
+    function optimize() {
+        const undone = state.tasks.filter(t => !t.done).sort((a,b) => b.cost - a.cost);
+        const done = state.tasks.filter(t => t.done);
+        const best = findPath(state.startME, undone);
+        if(best) { state.tasks = [...done, ...best]; save(); }
+    }
+
+    function findPath(me, tasks, path = []) {
+        if (tasks.length === 0) return path;
+        for (let i = 0; i < tasks.length; i++) {
+            if (me >= tasks[i].cost) {
+                const res = findPath(me - tasks[i].cost + tasks[i].gain, [...tasks.slice(0,i), ...tasks.slice(i+1)], [...path, tasks[i]]);
+                if (res) return res;
+            }
+        }
+        return null;
+    }
+
+    function archiveDay() {
+        const today = new Date().toDateString();
+        const success = state.tasks.length > 0 && state.tasks.every(t => t.done);
+        if (!state.xpClaims[today] && success) {
+            state.xp += 100; state.xpClaims[today] = true; state.streak++;
+        } else if (!success) { state.streak = 0; }
+        state.history[today] = { success, date: today };
+        state.tasks = []; state.chat = []; save();
+    }
+
+    init();
+</script>
+</body>
+</html>
